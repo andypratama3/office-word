@@ -142,6 +142,8 @@ Restart OpenCode setelah mengubah config.
 | Resize gambar asal (distorsi / luber halaman) | Fit-box proporsional (§5.3) |
 | Ganti nomor caption tanpa perbaiki acuan di teks | Renumber + ref selalu satu paket (§5.4) |
 | Edit XML langsung untuk ganti teks | Replace run-preserving (§5.5) |
+| Sisip `teks+break` di ujung (`X` lalu `\r`) | **Break dulu lalu teks** (`\r` lalu `X`) — urutan terbalik menempel ke paragraf lama bila dokumen berakhir tanpa paragraf kosong |
+| Percaya `active document` langsung setelah `open` | `ensure_active`: poll nama dokumen aktif hingga cocok (timeout) baru jalan; `verify_saved` setelah save |
 
 ---
 

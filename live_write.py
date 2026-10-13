@@ -48,10 +48,26 @@ def main():
             lines.append(args[i]); i += 1
 
     import time
-    # Pastikan dokumen target yang aktif
-    cur = run_script('tell application "Microsoft Word" to get name of active document')
+    # Pastikan dokumen target yang aktif (tunggu bila Word lambat; gagal = batal)
+    cur = ""
+    try:
+        cur = run_script('tell application "Microsoft Word" to get name of active document')
+    except RuntimeError:
+        pass
     if cur != doc_name:
         run_script(f'tell application "Microsoft Word" to open POSIX file "{word_file}"')
+        t0 = time.time()
+        while time.time() - t0 < 15:
+            try:
+                cur = run_script('tell application "Microsoft Word" to get name of active document')
+            except RuntimeError:
+                cur = ""
+            if cur == doc_name:
+                break
+            time.sleep(0.5)
+    if cur != doc_name:
+        print(f"ERROR: dokumen aktif '{cur}', bukan target '{doc_name}' — dibatalkan")
+        sys.exit(1)
 
     for line in lines:
         script = f'''
@@ -59,7 +75,7 @@ tell application "Microsoft Word"
     tell active document
         set n to count characters of text object of active document
         set endPos to collapse range (create range start 0 end n) direction collapse end
-        set content of endPos to ("{as_escape(line)}" & (ASCII character 13))
+        set content of endPos to ((ASCII character 13) & "{as_escape(line)}")
         set style of last paragraph to "{style}"
     end tell
 end tell
@@ -68,6 +84,10 @@ end tell
         time.sleep(delay)
 
     run_script('tell application "Microsoft Word" to save active document')
+    saved = run_script(f'tell application "Microsoft Word" to get saved of document "{doc_name}"')
+    if saved != "true":
+        print(f"ERROR: dokumen '{doc_name}' belum tersimpan (saved={saved})")
+        sys.exit(1)
     print(f"Live-wrote {len(lines)} paragraf ke {doc_name} (tanpa reload, sudah save)")
 
 if __name__ == "__main__":
