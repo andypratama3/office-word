@@ -224,3 +224,21 @@ paragraf yang berisi *field*, *hyperlink*, atau format manual kompleks.
 - Blok judul/penulis dipadatkan (afiliasi 11pt).
 - Footer: nomor halaman tengah via field `PAGE`.
 - Hapus spasi ganda sisa (kecuali blok kode).
+
+---
+
+## 6. Pindah session (handoff checklist)
+
+Sebelum menutup sesi kerja dokumen, catat 5 hal ini agar session berikutnya
+nyambung tanpa menebak:
+
+1. **Repo & git**: branch + commit terakhir tiap repo yang tersentuh
+   (`git log --oneline -2`, `git status -sb` harus bersih/setara remote).
+2. **File target**: path dokumen Word + sumber markdown bila ada + statusnya
+   (kata, tabel, gambar, penanda terbuka seperti `[PERLU REFERENSI: ...]`).
+3. **Fakta terverifikasi**: angka/tanggal/nama yang sudah dicek ke sumber
+   (tulis sumbernya, mis. "UAT 4,46 = hitung ulang 803/180 dari Tabel 12 docx").
+4. **Skrip sekali-pakai di `/tmp`**: `/tmp` HILANG saat reboot — resepnya sudah
+   ada di §5; bila skrip masih dibutuhkan, pindahkan ke `tools/` + commit.
+5. **Perintah resume**: `smart_write.py info auto` (cek dokumen aktif) +
+   `git log` di tiap repo. Aturan sinkron §0 dan pelajaran §4–§5 tetap berlaku.
