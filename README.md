@@ -7,8 +7,8 @@
 ## Mulai Cepat (5 menit, macOS / Linux)
 
 ```bash
-git clone <URL-FORK-INI>.git
-cd <nama-repo>
+git clone https://github.com/andypratama3/office-word.git
+cd office-word
 bash install.sh          # venv + dependensi + daftar MCP + pasang skills (idempotent)
 ```
 
