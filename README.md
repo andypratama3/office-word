@@ -27,6 +27,8 @@ daftarkan MCP sesuai `install.sh` langkah 3).
 | Pakai MCP + live-edit + smart_write | `skills/office-word-mcp/SKILL.md` |
 | Menulis skripsi (BAB I–V) | `skills/skripsi-writing/SKILL.md` |
 | Menulis artikel jurnal (IMRAD) | `skills/jurnal-writing/SKILL.md` |
+| Kemas naskah siap submit OJS (blind, metadata) | `skills/jurnal-submit-pack/SKILL.md` |
+| Proofread otomatis naskah Indonesia | `proofread_id.py Naskah.docx` |
 | Rapikan italic istilah asing (repo pendamping) | [office-skripsi](https://github.com/andypratama3/office-skripsi) |
 | Berkontribusi | `CONTRIBUTING.md` |
 

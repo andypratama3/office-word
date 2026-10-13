@@ -66,6 +66,19 @@ Kaedah isi:
 | Hasil | Fakta dulu, interpretasi di pembahasan; tiap tabel/gambar dirujuk di teks |
 | Kesimpulan | Klaim ≤ bukti; sebut limitasi |
 
+### 2b. Preset format siap pakai (teruji Okt 2026, naskah SINTA lolos cek)
+
+Pilih SATU sebelum membangun dokumen (template jurnal tujuan selalu menang):
+
+| Preset | Kertas/margin | Font/body | Kolom | Heading | Sitasi |
+|--------|---------------|-----------|-------|---------|--------|
+| **JTIIK** (SINTA 2, dua kolom) | A4, 3-3-2-2 (kiri-atas-kanan-bawah) | TNR 10pt spasi 1 | Judul+abstrak 1 kolom; badan 2 kolom @7,5 cm gap 1 cm; gambar/tabel full-width via section break | Judul caps 12pt; bab caps 10pt bold; abstrak EN italic | Harvard-Anglia caps (`NAMA, I., 2024.`) |
+| **SINTA-1kol** (generik JURSISTEKNI/JI-UPGRIS) | A4, 3-3-2-2 | TNR 12pt spasi 1 | 1 kolom | Judul 14pt; bab 12pt bold | APA nama-tahun |
+
+Detail bangun 2 kolom + full-width + Harvard: skill `office-word-mcp`
+§5.7–§5.8. Setelah naskah final → kemas dengan skill `jurnal-submit-pack`.
+Proofread otomatis: `proofread_id.py Naskah.docx` (harus BERSIH).
+
 ### 3. Hardening
 
 ```bash
