@@ -144,6 +144,8 @@ Restart OpenCode setelah mengubah config.
 | Edit XML langsung untuk ganti teks | Replace run-preserving (§5.5) |
 | Sisip `teks+break` di ujung (`X` lalu `\r`) | **Break dulu lalu teks** (`\r` lalu `X`) — urutan terbalik menempel ke paragraf lama bila dokumen berakhir tanpa paragraf kosong |
 | Percaya `active document` langsung setelah `open` | `ensure_active`: poll nama dokumen aktif hingga cocok (timeout) baru jalan; `verify_saved` setelah save |
+| `info auto` gagal padahal dokumen terbuka | `auto` = dokumen AKTIF; bila Word di background tanpa jendela aktif, fallback cek `get name of every document` (`is_open`) |
+| Verifikasi warna/link klaim "sudah" | Baca ulang run: `str(r.font.color.rgb)`, `r.underline` — substring bisa false-positive (`lapisan` mengandung `lapis`, gunakan word-boundary) |
 
 ---
 
@@ -172,10 +174,15 @@ Daftar Pustaka: deteksi paragraf pola `Nama. (Tahun).` → *hanging indent*
 ```python
 from docx import Document
 d = Document("skripsi.docx")
-# 1) симpan semua part gambar
+# 1) simpan semua part gambar (try/except: relasi non-image tidak punya .blob)
 for rel in d.part.rels.values():
-    if "image" in rel.target_ref:
-        open("fig/" + rel.target_ref.split("/")[-1], "wb").write(rel.target_part.blob)
+    try:
+        blob, ct = rel.target_part.blob, rel.target_part.content_type
+    except Exception:
+        continue
+    if blob and ct.startswith("image/"):
+        ext = ct.split("/")[-1]
+        open(f"fig/{rel.target_ref.split('/')[-1]}.{ext}", "wb").write(blob)
 # 2) urutan kemunculan di dokumen = urutan r:embed di document.xml
 import re
 embeds = re.findall(r'r:embed="(rId\d+)"', d.part.blob.decode("utf-8"))
@@ -224,6 +231,53 @@ paragraf yang berisi *field*, *hyperlink*, atau format manual kompleks.
 - Blok judul/penulis dipadatkan (afiliasi 11pt).
 - Footer: nomor halaman tengah via field `PAGE`.
 - Hapus spasi ganda sisa (kecuali blok kode).
+
+### 5.7 Layout dua kolom jurnal (resep JTIIK SINTA 2, teruji Okt 2026)
+
+Template 2 kolom (judul/abstrak 1 kolom, badan 2 kolom @7,5 cm gap 1 cm,
+margin 3-3-2-2, TNR 10pt) via `WD_SECTION.CONTINUOUS` + XML `w:cols`:
+
+```python
+from docx.enum.section import WD_SECTION
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+
+doc.add_section(WD_SECTION.CONTINUOUS)  # front-matter selesai -> badan
+sectPr = doc.sections[-1]._sectPr
+old = sectPr.find(qn("w:cols"))
+if old is not None:
+    sectPr.remove(old)
+cols = OxmlElement("w:cols")
+cols.set(qn("w:num"), "2")
+cols.set(qn("w:space"), "567")  # 1 cm; kolom 7,5 cm = 4252 twips
+for _ in range(2):
+    col = OxmlElement("w:col")
+    col.set(qn("w:w"), "4252")
+    col.set(qn("w:space"), "567")
+    cols.append(col)
+sectPr.append(cols)
+```
+
+- Gambar/tabel **full-width**: yang tidak perlu terjepit selebar kolom
+  dibungkus seksi 1 kolom (`set_layout(1)` → sisip → `set_layout(2)`).
+  Pola seksi akhir harus selang-seling `1-2-1-2…` dan berakhir di `2`
+  (verifikasi via `doc.sections` + `w:num`).
+- Gambar di kolom: lebar maks = lebar kolom (2,9 inci); full-width: 5,8 inci.
+  Flowchart tinggi selalu kunci tinggi (maks 9 inci) agar tidak luber halaman.
+- Judul tabel **satu sumber saja**: judul `**Tabel N.**` dari Markdown
+  dirender menyatu dengan tabelnya di seksi 1 kolom — jangan tambah
+  auto-insert judul (duplikat). Deteksi judul memakai regex `^Tabel \d+\.`
+  (kalimat badan seperti "Tabel 3 meringkas…" tidak berkoma-titik = bukan judul).
+
+### 5.8 Konversi sitasi ke Harvard-Anglia caps (gaya JTIIK)
+
+- Pustaka: `NAMA, I., NAMA2, J. & NAMA3, K., Tahun. Judul. *Jurnal*, Vol(No), pp.X–Y.`
+  Online: `LEMBAGA, Tahun. *Judul*. [online] Tersedia di: <URL>`.
+- In-text 3 penulis ditulis lengkap saat mengacu (`(A, B & C, 2024)`,
+  bukan `dkk.`); hanging-indent regex ikut berubah ke `^.+,\s*\d{4}\.`.
+- URL di dalam run teks harus di-split dulu (`re.split(r"(https?://\S+)")`)
+  sebelum diberi warna/garis bawah — URL yang menempel di run tidak kena
+  `startswith("http")`.
 
 ---
 

@@ -86,6 +86,12 @@ soffice --headless --convert-to pdf Artikel.italic.docx && pdftotext -layout Art
 - [ ] Konversi md→docx: caption 1–N berurutan + semua acuan `(Gambar N)` cocok;
       gambar fit-box proporsional; istilah asing miring (lihat skill
       `office-word-mcp` §5)
+- [ ] Kata kunci alfabetis + format ikut template (koma/titik-koma, italic?)
+- [ ] Gaya sitasi ikut template (Harvard caps vs APA vs IEEE) — konversi
+      menyeluruh badan + pustaka, bukan setengah (lihat `office-word-mcp` §5.8)
+- [ ] Layout kolom ikut template (2 kolom = front-matter 1 kolom + gambar/tabel
+      full-width via section break, lihat `office-word-mcp` §5.7)
+- [ ] Double-blind: hapus nama penulis saat submit review; file <2 MB
 
 ---
 
