@@ -43,13 +43,31 @@ $VENV smart_write.py heading FILE.docx "Judul Bab" [--level 1] [--delay 1] [--wa
 $VENV smart_write.py pagebreak FILE.docx [--watch]
 
 # Operasi file (otomatis save → tulis → reload bila dokumen terbuka)
-$VENV smart_write.py table FILE.docx ROWS COLS '[["a","b"],["1","2"]]' [--watch]
-$VENV smart_write.py replace FILE.docx "lama" "baru" [--watch]
+$VENV smart_write.py table FILE.docx ROWS COLS '[["a","b"],["1","2"]]' [--watch] [--no-reload]
+$VENV smart_write.py replace FILE.docx "lama" "baru" [--watch] [--no-reload]
+$VENV smart_write.py sync FILE.docx [--watch]  # save + satu reload (penutup batch)
+
+# FILE boleh "auto" = dokumen AKTIF di Word (deteksi otomatis, tanpa hardcode)
+$VENV smart_write.py info auto
+$VENV reload_word.py            # reload dokumen aktif, background
+$VENV reload_word.py FILE.docx --watch   # reload + bawa Word ke depan
 
 # Baca (tidak mengubah apa pun)
 $VENV smart_write.py read FILE.docx
 $VENV smart_write.py info FILE.docx
 ```
+
+Batch hemat reload (3 operasi file = 1 reload):
+
+```bash
+$VENV smart_write.py table F.docx 2 2 '[["a","b"],["1","2"]]' --no-reload
+$VENV smart_write.py replace F.docx "lama" "baru" --no-reload
+$VENV smart_write.py sync F.docx
+```
+
+Reload itu background murni: Word disembunyikan sesaat selama tukar dokumen
+(tanpa kedip bila di background), posisi scroll dikembalikan, fokus aplikasi
+tidak dicuri. `--watch` hanya untuk demo yang memang ditonton.
 
 Aturan sinkronisasi (jangan dilawan):
 
@@ -121,3 +139,86 @@ Restart OpenCode setelah mengubah config.
 | Ganti isi tengah dokumen via live mode | `replace` (jalur file) |
 | Klaim tabel/format aman tanpa cek | `info` → `table_count`, `read` → verifikasi teks |
 | Commit `.venv-mcp/` ke git | Sudah di `.gitignore` — tiap device bikin venv sendiri via `install.sh` |
+| Resize gambar asal (distorsi / luber halaman) | Fit-box proporsional (§5.3) |
+| Ganti nomor caption tanpa perbaiki acuan di teks | Renumber + ref selalu satu paket (§5.4) |
+| Edit XML langsung untuk ganti teks | Replace run-preserving (§5.5) |
+
+---
+
+## 5. Membangun dokumen jurnal dari Markdown + gambar (resep terbukti)
+
+Pola yang dipakai untuk `Jurnal_Andy_Pratama.docx` (4000 kata, 6 tabel, 8 gambar).
+Prinsip: **satu skrip build → verifikasi → satu reload di akhir.**
+
+### 5.1 Parse Markdown → python-docx
+
+| Sintaks md | Hasil docx |
+|------------|-----------|
+| `# ` | Judul 16pt bold tengah |
+| `## ` / `### ` | Heading 1 (14pt) / Heading 2 (12pt), Times New Roman |
+| `**tebal**`, `*miring*`, `` `kode` `` | Run bold / italic / Consolas 10pt (regex `(\*\*.+?\*\*|\*[^*\n]+?\*|`+"`[^`\n]+?`"+`)`) |
+| Tabel `\|` + baris pemisah | `Table Grid`, header shading `4472C4` + teks putih bold |
+| Blok ```` ```mermaid ```` | Ekstrak isi `[...]` → paragraf style `List Number` |
+| Rumus `$...$` | Ganti jadi teks polos (`x̄ = Σxi / n`) |
+| `> ` | Catatan italic 11pt |
+
+Daftar Pustaka: deteksi paragraf pola `Nama. (Tahun).` → *hanging indent*
+(`left_indent` 1 cm + `first_line_indent` −1 cm).
+
+### 5.2 Gambar: ekstrak, petakan, verifikasi visual
+
+```python
+from docx import Document
+d = Document("skripsi.docx")
+# 1) симpan semua part gambar
+for rel in d.part.rels.values():
+    if "image" in rel.target_ref:
+        open("fig/" + rel.target_ref.split("/")[-1], "wb").write(rel.target_part.blob)
+# 2) urutan kemunculan di dokumen = urutan r:embed di document.xml
+import re
+embeds = re.findall(r'r:embed="(rId\d+)"', d.part.blob.decode("utf-8"))
+```
+
+- Gambar kecil (1–8 KB) biasanya ikon/logo — abaikan; yang besar berurutan
+  biasanya cocok dengan urutan caption (Gambar 1–N). **Selalu verifikasi visual**
+  minimal gambar kunci sebelum dipakai (salah label = fatal).
+- Hanya sisipkan gambar yang **dirujuk di teks**; tiap penyisipan wajib ditemani caption.
+
+### 5.3 Ukuran gambar: fit-box proporsional (A4, margin 3 cm)
+
+Baca dimensi PNG dari header (byte 16–24, tanpa dependensi tambahan),
+lalu muatkan ke kotak **maks 5,8 inci × 7,5 inci** (tinggi dibatasi agar
+caption tetap sehalaman):
+
+- Aspek ≤ 1,2 (screenshot, grafik): kunci **lebar** 5,8 inci.
+- Aspek > 1,2 (flowchart tinggi, ERD): kunci **tinggi** 6,8 inci.
+- Jangan set lebar+tinggi manual dari tebakan — selalu hitung dari dimensi asli.
+
+### 5.4 Caption + acuan teks = satu paket
+
+- Caption di bawah gambar, tengah, 11pt, label bold (`Gambar N.` + teks biasa).
+- Urutan caption di dokumen **harus** 1–N berurutan — cek via
+  `get_document_outline` / baca semua paragraf `Gambar \d+\.`.
+- Tiap renumber caption, perbaiki **semua** acuan `(Gambar N)` di teks pada
+  skrip yang sama. Sumber salah acuan umum: teks masih memakai nomor gambar
+  dokumen asal (skripsi) padahal caption sudah dinomori ulang untuk jurnal.
+
+### 5.5 Ganti teks tanpa menghancurkan format
+
+Fungsi `replace_in_para(p, old, new)`: bila string target dalam **satu run**,
+ganti di run itu saja. Bila terpecah antar-run, rebuild paragraf via parser
+§5.1 (aman bila paragraf hanya berisi markdown inline). Jangan rebuild
+paragraf yang berisi *field*, *hyperlink*, atau format manual kompleks.
+
+### 5.6 Hardening layout (satu skrip, sebelum reload final)
+
+- Body rata kanan-kiri, TNR 12, `space_after` 6pt, spasi tunggal, widow control.
+- Heading 1/2: `keep_with_next` + `space_before` 12/6pt (heading tak boleh
+  yatim di bawah halaman).
+- Paragraf gambar: `keep_with_next` (gambar menempel caption);
+  caption `space_before` 6pt + `space_after` 12pt.
+- Header tabel: `w:tblHeader` = true (berulang tiap halaman).
+- Blok kode: `keep_together` + shading `F2F2F2`.
+- Blok judul/penulis dipadatkan (afiliasi 11pt).
+- Footer: nomor halaman tengah via field `PAGE`.
+- Hapus spasi ganda sisa (kecuali blok kode).

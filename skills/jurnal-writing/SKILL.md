@@ -83,6 +83,9 @@ soffice --headless --convert-to pdf Artikel.italic.docx && pdftotext -layout Art
 - [ ] Abstrak ≤ batas kata jurnal, kata kunci 3–5
 - [ ] Tidak ada data/angka yang dikarang — tiap angka tertelusur ke sumber
 - [ ] Similarity siap cek (parafrasa definisi umum dengan kalimat sendiri)
+- [ ] Konversi md→docx: caption 1–N berurutan + semua acuan `(Gambar N)` cocok;
+      gambar fit-box proporsional; istilah asing miring (lihat skill
+      `office-word-mcp` §5)
 
 ---
 

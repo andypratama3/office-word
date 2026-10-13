@@ -6,15 +6,23 @@
 - Operasi yang tidak bisa live (tabel, replace) saat dokumen terbuka:
   save dulu -> tulis file -> reload (aman, tidak ada yang hilang).
 - --watch: bukakan dokumen di Word dulu agar bisa ditonton.
+- FILE boleh berupa path, atau "auto" = dokumen AKTIF di Word (deteksi otomatis,
+  tanpa hardcode). Contoh: smart_write.py info auto
 
 Pakai:
   smart_write.py append FILE "teks" [--style "Heading 2"] [--delay 1.5] [--watch]
   smart_write.py heading FILE "teks" [--level 1] [--delay 1.5] [--watch]
   smart_write.py pagebreak FILE [--watch]
-  smart_write.py table FILE ROWS COLS '[["a","b"],["1","2"]]' [--watch]
-  smart_write.py replace FILE "lama" "baru" [--watch]
+  smart_write.py table FILE ROWS COLS '[["a","b"],["1","2"]]' [--watch] [--no-reload]
+  smart_write.py replace FILE "lama" "baru" [--watch] [--no-reload]
+  smart_write.py sync FILE [--watch]   # save + satu reload (penutup batch --no-reload)
   smart_write.py read FILE
   smart_write.py info FILE
+
+Batch hemat reload (3 op file = 1 reload):
+  smart_write.py table F 2 2 '[["a","b"],["1","2"]]' --no-reload
+  smart_write.py replace F "lama" "baru" --no-reload
+  smart_write.py sync F
 """
 import asyncio
 import json
@@ -51,6 +59,17 @@ def is_open(word_file: str) -> bool:
     return word_file.rsplit("/", 1)[-1] in open_docs()
 
 
+def detect_active_doc() -> str:
+    """Path dokumen aktif di Word (deteksi otomatis, tanpa hardcode)."""
+    try:
+        out = osa('tell application "Microsoft Word" to get posix full name of active document')
+    except RuntimeError as e:
+        raise SystemExit(f"ERROR: tidak ada dokumen aktif di Word ({e})")
+    if not out or out == "missing value":
+        raise SystemExit("ERROR: tidak ada dokumen aktif di Word")
+    return out
+
+
 def front(word_file: str):
     osa(f'tell application "Microsoft Word" to open POSIX file "{word_file}"')
 
@@ -59,15 +78,13 @@ def word_save():
     osa('tell application "Microsoft Word" to save active document')
 
 
-def word_reload(word_file: str):
-    doc = word_file.rsplit("/", 1)[-1]
-    osa(f'''tell application "Microsoft Word"
-    try
-        close document "{esc(doc)}" saving no
-    end try
-    open POSIX file "{word_file}"
-    activate
-end tell''')
+def word_reload(word_file: str, watch: bool = False):
+    """Reload via reload_word.py: background (scroll pulih, fokus tak dicuri)
+    kecuali watch=True."""
+    import os
+    helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reload_word.py")
+    cmd = [sys.executable, helper, word_file] + (["--watch"] if watch else [])
+    subprocess.run(cmd, check=True)
 
 
 def live_append(lines: list, style: str, delay: float):
@@ -100,9 +117,13 @@ def main():
         print(__doc__)
         sys.exit(1)
     cmd, word_file = sys.argv[1], sys.argv[2]
+    if word_file == "auto":
+        word_file = detect_active_doc()
+        print(f"[auto] dokumen aktif: {word_file}")
     rest = sys.argv[3:]
     watch = "--watch" in rest
-    rest = [a for a in rest if a != "--watch"]
+    no_reload = "--no-reload" in rest  # gabung beberapa op file -> satu reload via 'sync'
+    rest = [a for a in rest if a not in ("--watch", "--no-reload")]
 
     def opt(name, default):
         if name in rest:
@@ -114,8 +135,8 @@ def main():
         time.sleep(2)
 
     opened = is_open(word_file)
-    if opened:
-        front(word_file)  # pastikan jendela target yang di depan
+    if opened and (watch or osa('tell application "Microsoft Word" to get name of active document') != word_file.rsplit("/", 1)[-1]):
+        front(word_file)  # hanya ke depan bila ditonton atau dokumen lain yang aktif
 
     from word_document_server.tools import document_tools, content_tools
 
@@ -124,8 +145,8 @@ def main():
             word_save()  # flush ketikan user dulu, aman
         res = await coro
         print(res)
-        if opened and need_reload:
-            word_reload(word_file)
+        if opened and need_reload and not no_reload:
+            word_reload(word_file, watch)
             print(f"[reload] {word_file}")
         return res
 
@@ -179,6 +200,14 @@ def main():
             print(await document_tools.get_document_text(word_file))
         elif cmd == "info":
             print(await document_tools.get_document_info(word_file))
+        elif cmd == "sync":
+            # save (flush ketikan) + satu reload background; penutup batch --no-reload
+            if opened:
+                word_save()
+                word_reload(word_file, watch)
+                print(f"[sync] {word_file}")
+            else:
+                print(f"[sync] {word_file} tidak terbuka, tidak ada yang perlu disinkron")
         else:
             print("Perintah tak dikenal:", cmd)
             sys.exit(1)

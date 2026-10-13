@@ -27,6 +27,13 @@ def main():
         print("Pakai: live_write.py FILE.docx \"teks1\" [\"teks2\" ...] [--style NAMA] [--delay DETIK]")
         sys.exit(1)
     word_file = args[0]
+    if word_file == "auto":
+        # deteksi dokumen aktif (tanpa hardcode)
+        word_file = run_script('tell application "Microsoft Word" to get posix full name of active document')
+        if not word_file or word_file == "missing value":
+            print("ERROR: tidak ada dokumen aktif di Word")
+            sys.exit(1)
+        print(f"[auto] dokumen aktif: {word_file}")
     doc_name = word_file.rsplit("/", 1)[-1]
     style = "Normal"
     delay = 1.5
