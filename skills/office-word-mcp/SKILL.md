@@ -146,6 +146,8 @@ Restart OpenCode setelah mengubah config.
 | Percaya `active document` langsung setelah `open` | `ensure_active`: poll nama dokumen aktif hingga cocok (timeout) baru jalan; `verify_saved` setelah save |
 | `info auto` gagal padahal dokumen terbuka | `auto` = dokumen AKTIF; bila Word di background tanpa jendela aktif, fallback cek `get name of every document` (`is_open`) |
 | Verifikasi warna/link klaim "sudah" | Baca ulang run: `str(r.font.color.rgb)`, `r.underline` — substring bisa false-positive (`lapisan` mengandung `lapis`, gunakan word-boundary) |
+| Reload sukses tapi konten Word basi | Cek `count documents` — dokumen mungkin tertutup oleh run gagal sebelumnya; buka ulang biasa (tanpa System Events) |
+| Asumsi reload gagal = file rusak | Pisahkan diagnosis: file di disk (baca via python-docx) vs tampilan Word (AppleScript); perbaiki yang terbukti rusak saja |
 
 ---
 
@@ -278,6 +280,43 @@ sectPr.append(cols)
 - URL di dalam run teks harus di-split dulu (`re.split(r"(https?://\S+)")`)
   sebelum diberi warna/garis bawah — URL yang menempel di run tidak kena
   `startswith("http")`.
+
+### 5.9 Otomatisasi rantai build + standar Word (teruji Okt 2026)
+
+Rantai sekali jalan (`build_all.sh`, `set -e`): Markdown → DOCX → format
+template → `proofread_id.py` (gerbang, exit ≠ 0 = stop) → `reload_word.py`
+background. Jangan reload manual antar langkah.
+
+Standar Word yang diotomatiskan saat build (bukan manual di Word):
+
+- `w:lang` (`id-ID`) di tiap run untuk bahasa proofing.
+- Core properties: `keywords` diisi dari baris Kata kunci/Keywords,
+  `subject`/`category`/`comments` diisi.
+- `w:updateFields=true` di `settings.xml` agar field refresh saat dibuka.
+- Normalisasi white space di parser (`re.sub(r"\s+", " ", t)`), bukan di Word.
+- Penomoran heading manual ("1.", "2.1") SENGAJA dipertahankan sebagai teks
+  (bukan `numbering.xml`): template jurnal menuntut angka statis, dan
+  auto-numbering berisiko ganda saat naskah ditempel ke template OJS.
+
+Jebakan blok judul (wajib dihindari):
+
+- Baris MD berurutan TANPA baris kosong digabung parser menjadi satu
+  paragraf — penulis/afiliasi/email/korespondensi/catatan WAJIB dipisah
+  baris kosong, dan guard build (`seen_heading`: mode header berakhir di
+  heading pertama) mencegah abstrak tertelan logika header.
+- Format pass WAJIB deteksi isi (bukan indeks `paras[N]`): baris kosong
+  spacer menggeser indeks. Baris kosong spesifikasi template (sesudah judul,
+  penulis, email, catatan, heading abstrak, 1× sesudah abstrak, 2× sesudah
+  kata kunci) dibuat via spacer 10pt eksplisit.
+
+Ketahanan reload (pelajaran insiden hang Okt 2026):
+
+- Gejala: `osascript` System Events menggantung → penyebab: revoke/flakiness
+  assistive access (TCC), dialog modal di Word, atau dokumen sudah tertutup.
+- Diagnosis: perintah Word murni (`count documents`, close, open) satu per
+  satu; bila System Events yang macet, Word-nya sendiri sehat.
+- `reload_word.py` dipecah dua fase (SWAP wajib + RESTORE best-effort) plus
+  fallback `open` langsung tanpa assistive access bila SWAP gagal.
 
 ---
 

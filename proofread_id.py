@@ -53,6 +53,30 @@ DRAFT = ("[PERLU", "[DATA]", "[TODO]", "TODO:", "FIXME", "XXX", "[heter",
          "TBD", "lorem ipsum")
 
 
+def journal_checks(paras):
+    """Cek standar jurnal: panjang abstrak + jumlah kata kunci."""
+    out = []
+    for i, (text, ctx) in enumerate(paras):
+        t = text.strip()
+        if t.upper() in ("ABSTRAK", "ABSTRACT"):
+            body = paras[i + 1][0] if i + 1 < len(paras) else ""
+            # lewati baris kosong
+            j = i + 1
+            while j < len(paras) and not paras[j][0].strip():
+                j += 1
+            body = paras[j][0] if j < len(paras) else ""
+            n = len(body.split())
+            if n and not 150 <= n <= 250:
+                out.append(("ERROR", f"abstrak {t} = {n} kata (syarat 150–250)",
+                            ctx, body[:100]))
+        if re.match(r"(?i)^kata kunci\s*:|^keywords\s*:", t):
+            items = [x.strip(" *") for x in re.split(r"[,;]", t.split(":", 1)[1]) if x.strip(" *")]
+            if not 3 <= len(items) <= 6:
+                out.append(("ERROR", f"kata kunci = {len(items)} (syarat 3–6)",
+                            ctx, t[:100]))
+    return out
+
+
 def iter_paras(doc):
     """Yield (teks, heading_terdekat) untuk tiap paragraf + sel tabel."""
     cur = ""
@@ -116,7 +140,8 @@ def main():
         sys.exit(2)
     doc = Document(args[0])
     findings = []
-    for text, ctx in iter_paras(doc):
+    paras = list(iter_paras(doc))
+    for text, ctx in paras:
         for level, msg in check(text):
             if level == "INFO" and strict:
                 level = "ERROR"
@@ -124,6 +149,9 @@ def main():
                 continue
             findings.append({"level": level, "konteks": ctx,
                              "pesan": msg, "cuplikan": text[:100]})
+    for level, msg, ctx, clip in journal_checks(paras):
+        findings.append({"level": level, "konteks": ctx,
+                         "pesan": msg, "cuplikan": clip})
     if as_json:
         print(json.dumps(findings, indent=2, ensure_ascii=False))
     else:

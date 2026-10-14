@@ -46,8 +46,12 @@ else:
                   "        log (\"restore focus gagal: \" & errMsg)\n"
                   "    end try")
 
-SCRIPT = f'''tell application "System Events"
-    set prevApp to name of first process whose frontmost is true
+# FASE 1 (wajib berhasil): sembunyikan Word, tukar dokumen, kembalikan scroll.
+# FASE 2 (best-effort): kembalikan visibilitas + fokus aplikasi sebelumnya.
+# Dipisah agar macet pada fase fokus tidak menutupi suksesnya reload
+# (ditemukan Okt 2026: query System Events soal frontmost bisa menggantung
+#  sementara perintah Word-nya sendiri baik-baik saja).
+SWAP = f'''tell application "System Events"
     tell process "Microsoft Word"
         set wasVisible to visible
         set visible to false
@@ -72,13 +76,32 @@ tell application "System Events"
     tell process "Microsoft Word"
         set visible to wasVisible
     end tell
+end tell
+'''
+
+RESTORE = f'''tell application "System Events"
+    set prevApp to name of first process whose frontmost is true
     {focus_back}
 end tell
 '''
 
-r = subprocess.run(["osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=30)
+r = subprocess.run(["osascript", "-e", SWAP], capture_output=True, text=True, timeout=60)
 if r.returncode != 0:
-    print("RELOAD GAGAL:", r.stderr.strip())
-    sys.exit(1)
+    # Fallback: buka langsung tanpa sembunyi/fokus (tidak perlu assistive access).
+    # Terjadi bila System Events menggantung (TCC assistive-access revoke).
+    r3 = subprocess.run(["osascript", "-e",
+                         f'tell application "Microsoft Word" to open POSIX file "{WORD_FILE}"'],
+                        capture_output=True, text=True, timeout=60)
+    if r3.returncode != 0:
+        print("RELOAD GAGAL:", (r.stderr.strip() or r3.stderr.strip())[:200])
+        sys.exit(1)
+    print(f"Reloaded (open-fallback): {DOC_NAME}")
+    sys.exit(0)
+try:
+    r2 = subprocess.run(["osascript", "-e", RESTORE], capture_output=True, text=True, timeout=15)
+    if r2.returncode != 0:
+        print("peringatan fokus:", r2.stderr.strip()[:100])
+except subprocess.TimeoutExpired:
+    print("peringatan: pengembalian fokus timeout (reload tetap berhasil)")
 mode = "watch" if WATCH else "background"
 print(f"Reloaded ({mode}): {DOC_NAME}")

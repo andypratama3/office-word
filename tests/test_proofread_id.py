@@ -39,3 +39,15 @@ def test_proofread_bersih(tmp_path: Path):
     r = subprocess.run([PY, str(TOOL), str(f)], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
     assert "BERSIH" in r.stdout
+
+
+def test_proofread_cek_jurnal(tmp_path: Path):
+    f = tmp_path / "jurnal.docx"
+    doc = Document()
+    doc.add_heading("ABSTRAK", level=1)
+    doc.add_paragraph("kata " * 100)  # 100 kata -> di bawah 150
+    doc.add_paragraph("Kata kunci: satu, dua")
+    doc.save(f)
+    r = subprocess.run([PY, str(TOOL), str(f)], capture_output=True, text=True)
+    assert r.returncode == 1, r.stdout
+    assert "150–250" in r.stdout and "3–6" in r.stdout
